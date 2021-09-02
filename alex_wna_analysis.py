@@ -25,7 +25,7 @@ freq_all = []
 coor_all = []
 
 for lats in [-60, -40, -20, 0, 20, 40, 60]:
-    for lons in [-180, -120, -60, 0, 60, 120, 180]:
+    for lons in np.linspace(-180,180,91):
         pos_array = [[500.0e3+R_E, lats, lons]]
         dt_array = [dt.datetime(2014,1,1,12,0,0, tzinfo=dt.timezone.utc)]
         crs1 = 'GEO'
@@ -89,9 +89,7 @@ for lats in [-60, -40, -20, 0, 20, 40, 60]:
 # print(wnas_all)
 
 wnas = np.asarray(wnas_all)
-print(np.shape(wnas))
 freq = np.asarray(freq_all)
-print(np.shape(freq))
 # coor = np.asarray(coor_all)
 radi_all = []
 lati_all = []
@@ -105,28 +103,69 @@ lati = np.asarray(lati_all)
 long = np.asarray(long_all)
 
 
-# sns.set(style=“ticks”)
-fig, (ax0) = plt.subplots(1, 1, figsize=(8,5), dpi=250, constrained_layout=True)
-ax0.scatter(long, radi)#, s=2, c=np.rad2deg(wnas), cmap=‘gnuplot2’)
-ax0.set_ylabel('Earth Radii')
-ax0.set_xlabel('Longitude')
-# cb = fig.colorbar(c, ax=ax0)
-# cb.set_label(r’$\theta$ [deg]’)
+
+
+# # sns.set(style=“ticks”)
+# fig, (ax0) = plt.subplots(1, 1, figsize=(8,5), dpi=250, constrained_layout=True)
+# ax0.scatter(long, radi)#, s=2, c=np.rad2deg(wnas), cmap=‘gnuplot2’)
+# ax0.set_ylabel('Earth Radii')
+# ax0.set_xlabel('Longitude')
+# # cb = fig.colorbar(c, ax=ax0)
+# # cb.set_label(r’$\theta$ [deg]’)
+# plt.show()
+
+# # sns.set(style=“ticks”)
+# fig, (ax0) = plt.subplots(1, 1, figsize=(8,5), dpi=250, constrained_layout=True)
+# ax0.scatter(lati, radi)#, s=2, c=np.rad2deg(wnas), cmap=‘gnuplot2’)
+# ax0.set_ylabel('Earth Radii')
+# ax0.set_xlabel('Latitude')
+# # cb = fig.colorbar(c, ax=ax0)
+# # cb.set_label(r’$\theta$ [deg]’)
+# plt.show()
+
+wnas_0to90 = np.abs(np.abs(np.rad2deg(wnas)-90)-90)
+
+# # plt.style.use(‘seaborn’)
+# # import seaborn as sns
+# plt.figure(figsize=(8,4), dpi = 250)
+# plt.hist(wnas_0to90, bins=45)
+# # plt.yscale('log')
+# plt.title('Raytracer WNA Distribution')
+# plt.show()
+
+
+# # plot
+# fig, ax = plt.subplots(subplot_kw=dict(projection="polar"))
+
+# pc = ax.scatter(np.deg2rad(long), radi, s=5, c=wnas_0to90, cmap="magma_r")
+# fig.colorbar(pc)
+# ax.grid(True)
+# plt.show()
+
+
+# import spacepy.datamodel as dm
+# import numpy as np
+# import spacepy.plot as splot
+# sd = dm.SpaceData()
+# sd['radius'] = dm.dmarray(radi, attrs={'units':'Re'})
+# sd['longitude'] = dm.dmarray(long, attrs={'units':'deg'})
+# sd['wna'] = dm.dmarray(wnas_0to90,  attrs={'units':'deg'})
+# spec = splot.Spectrogram(sd, variables=['radius', 'longitude', 'wna'], cmap="magma_r")
+# ax = spec.plot()
+
+from scipy.stats import binned_statistic_2d
+
+bins_radi = np.linspace(0,9,41)
+bins_long = np.linspace(-180, 180, 91)
+H, xedges, yedges, binnumber = binned_statistic_2d(np.deg2rad(long[:,0]), radi[:,0], wnas_0to90, statistic='mean', bins=[len(bins_long), len(bins_radi)])
+XX, YY = np.meshgrid(xedges, yedges)
+
+fig, ax = plt.subplots(subplot_kw=dict(projection="polar"))
+pc = ax.pcolormesh(XX,YY,H.T, cmap="magma_r")
+fig.colorbar(pc)
+ax.grid(True)
 plt.show()
 
-# sns.set(style=“ticks”)
-fig, (ax0) = plt.subplots(1, 1, figsize=(8,5), dpi=250, constrained_layout=True)
-ax0.scatter(lati, radi)#, s=2, c=np.rad2deg(wnas), cmap=‘gnuplot2’)
-ax0.set_ylabel('Earth Radii')
-ax0.set_xlabel('Latitude')
-# cb = fig.colorbar(c, ax=ax0)
-# cb.set_label(r’$\theta$ [deg]’)
-plt.show()
-
-# plt.style.use(‘seaborn’)
-# import seaborn as sns
-plt.figure(figsize=(8,4), dpi = 250)
-plt.hist(np.rad2deg(wnas), bins=45)
-# plt.yscale('log')
-plt.title('Raytracer WNA Distribution')
-plt.show()
+# print(len(np.deg2rad(long[:,0])))
+# print(len(radi[:,0]))
+# print(len(wnas_0to90))
