@@ -99,3 +99,5 @@ for lats in [-60, -40, -20, 0, 20, 40, 60]:
 # for r in raylist:
 #     plotray2D(dt_array[0], [r], ray_out_dir, crs='GEO', carsph='car', units=['Re','Re','Re'], md=md, checklat=pos_array[0][1], t_save=None, plot_wna=False, show_plot=True, damping_vals=None)
 
+
+## testing git push
