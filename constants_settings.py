@@ -16,7 +16,7 @@ M_EL = 9.1e-31                # kg
 M_P = 1.67e-27                # kg
 
 # where is the raytracer?? point to bin directory
-raytracer_dir = '/home/rileyannereid/workspace/Stanford_Raytracer/bin'
+raytracer_dir = '/home/alwo2026/Workspace/Stanford_Raytracer/bin'
 
 #  --------------------------- CHANGE ENV SETTINGS HERE  --------------------------
 # Environmental parameters
@@ -30,23 +30,23 @@ BzIMF = -5
 W = [0.132, 0.303, 0.083, 0.070, 0.211, 0.308]  # Doesn't matter if we're not using Tsyg
 
 # Simulation parameters
-t_max = 10        # Maximum duration in seconds
+t_max = 10        # Maximum duration in seconds - might need to change if rays get stuck decrease
 dt0 = 1e-3       # Initial timestep in seconds
 dtmax = 0.1      # Maximum allowable timestep in seconds
 root = 2         # Which root of the Appleton-Hartree equation
                  # (1 = negative, 2 = positive)
                  # (2 = whistler in magnetosphere)
 fixedstep = 0    # Don't use fixed step sizes, that's a bad idea.
-maxerr = 5.0e-3  # Error bound for adaptive timestepping
+maxerr = 5.0e-3  # Error bound for adaptive timestepping - might need to lower to get more precision or increase if gets stuck (generally between 1e-2 and 1e-4)
 maxsteps = 5e3   # Max number of timesteps (abort if reached)
 use_IGRF = 1     # Magnetic field model (1 for IGRF, 0 for dipole)
 use_tsyg = 1     # Use the Tsyganenko magnetic field model corrections
-minalt = R_E+475e3   # cutoff altitude in meters
+minalt = R_E+475e3   # cutoff altitude in meters - might need to change (how close to earth before terminates)
 
 # Should we include a geometric focusing term in the damping?
 include_geom_factor = 0  # 1 for yes
 
-# interpolation parameters for mode 4
+# interpolation parameters for mode 4 - mode 4 doesnt work
 scattered_interp_window_scale = 1.2
 scattered_interp_order = 2
 scattered_interp_exact = 0  # Try 0 if there's weirdness at discontinuities

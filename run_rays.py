@@ -8,7 +8,7 @@ from constants_settings import *
 from run_model_dump import modeldump
 from raytracer_utils import get_yearmiliday
 
-def single_run_rays(ray_datenum, positions, directions, freqs, rayfile_directory, mode, runmodeldump=False):
+def single_run_rays(ray_datenum, positions, directions, freqs, rayfile_directory, mode, fn_str, runmodeldump=False):
 
     fp = str(multiprocessing.current_process())[19:36]
     fp = fp.replace("'",'')
@@ -55,7 +55,9 @@ def single_run_rays(ray_datenum, positions, directions, freqs, rayfile_directory
     os.chdir(raytracer_dir)
 
     # Set output file path
-    ray_outfile = os.path.join(ray_out_dir, 'ray_out_mode%d_%s.ray' % (mode,fp))
+    ray_fn = 'ray_out_mode%d_'%(mode)+fn_str+'_%s.ray'%(fp)
+    ray_outfile = os.path.join(ray_out_dir, ray_fn)
+    print(ray_outfile)
     damp_outfile = os.path.join(ray_out_dir, 'ray_out_mode%d.damp' % mode)
 
     # The base command -- with parameters common for all modes
@@ -145,13 +147,13 @@ def single_run_rays(ray_datenum, positions, directions, freqs, rayfile_directory
     return 
 
 # -------------------------------- PARALLELIZE --------------------------------
-def parallel_run_rays(time_list, position_list, direction_list, freq_list, output_directory, mds):
+def parallel_run_rays(time_list, position_list, direction_list, freq_list, output_directory, mds, fn_str):
 
     # parallel
     nmbrcores = cpu_count()
     print(nmbrcores, ' run')
 
-    lstarg = zip(time_list, position_list, direction_list, freq_list, output_directory, mds)
+    lstarg = zip(time_list, position_list, direction_list, freq_list, output_directory, mds, fn_str)
     
     with Pool(nmbrcores) as p:
         results = p.starmap(single_run_rays, lstarg)

@@ -8,76 +8,94 @@ from bfield import getBdir
 from run_rays import single_run_rays, parallel_run_rays
 from raytracer_utils import read_rayfile, read_damp_simple
 from ray_plots import plotray2D, plotrefractivesurface, plot_plasmasphere_2D
+import PyGeopack as gp
+
 
 # example call to ray tracer!
 # --------------------------------------- set up ------------------------------------------
-rayfile_directory = '/media/rileyannereid/DEMETER/SR_output' # store output here
+rayfile_directory = '/home/alwo2026/Workspace/SR_output' # store output here
 
 # FIRST, navigate to constants_settings and make sure the settings are correct for the run
 
-# let's look at a conjunction between DSX and VPM:
-# use the datetime package to define the start time -- make sure to use UTC timezone
-ray_datenum = dt.datetime(2020,6,6,19,56,9, tzinfo=dt.timezone.utc)
+# picking start position in GEO sph and converting to SM car
 
-# we need the positions of the satellites -- use the sat class
-dsx = sat()             # define a satellite object
-dsx.catnmbr = 44344     # provide NORAD ID
-dsx.time = ray_datenum  # set time
-dsx.getTLE_ephem()      # get TLEs nearest to this time -- sometimes this will lag
+for lats in [-60, -40, -20, 0, 20, 40, 60]:
+    for lons in [-180, -120, -60, 0, 60, 120, 180]:
 
-# propagate the orbit! setting sec=0 will give you just the position at that time
-dsx.propagatefromTLE(sec=0, orbit_dir='future', crs='SM', carsph='car', units=['m','m','m'])
+    pos_array = [[500.0e3+R_E, lats, lons]]
+    dt_array = [dt.datetime(2014,1,1,12,0,0, tzinfo=dt.timezone.utc)]
+    crs1 = 'GEO'
+    crs2 = 'SM'
+    carsph1 = 'sph'
+    carsph2 = 'car'
+    units1 = ['m','deg','deg']
+    units2 = ['m','m','m']
+    ray_start = convert2(pos_array, dt_array, crs1, carsph1, units1, crs2, carsph2, units2)
 
-# now we have ray start point in the correct coordinates (SM cartesian in m)
-ray_start = dsx.pos
+    # setting frequeinces
+    freqs = [1.0e3, 2.0e3, 3.0e3, 4.0e3, 5.0e3, 6.0e3, 7.0e3, 8.0e3] # Hz
 
-freqs = [2.8e3, 8.2e3, 28e3] # Hz
+    # Which plasmasphere model should we run?
+    #   1 - Ngo model - do NOT use
+    #   6 - Simplified GCPM from Austin Sousa's thesis
+    #   7 - New! Diffusive Equilibrium AT64ThCh (see docs)
+    md = 7
 
-# Which plasmasphere model should we run?
-#   6 - Simplified GCPM from Austin Sousa's thesis
-#   7 - New! Diffusive Equilibrium AT64ThCh (see docs)
-md = 7
+    # how many rays? 
+    nrays = len(freqs) # how many rays
 
-# how many rays? 
-nrays = 3 # how many rays -- THIS MUST BE EQUAL IN LENGTH TO THETAS
+    # next, define the direction of the ray
+    makedate = dt_array[0].strftime('%Y%m%d')
+    Date = int(makedate)
+    ut = dt_array[0].hour + dt_array[0].minute/60 + dt_array[0].second/3600
 
-# next, define the direction of the ray
-# this step will actually run the raytracer to sample the Bfield correctly
-# theta = 0 goes north, theta=180 goes south
-thetas = [-45 for i in range(1)] # go south
-directions = []
-for i in range(nrays):
-    freq = freqs[i]
-    direc, ra, thetas, phis = getBdir(ray_start, ray_datenum, rayfile_directory, thetas, np.zeros(len(thetas)), md, freq)
-
-    directions.append(direc[0])
+    Bx,By,Bz = gp.ModelField(ray_start[0][0]/R_E,ray_start[0][1]/R_E,ray_start[0][2]/R_E,Date,ut,Model='T96',CoordIn='SM',CoordOut='SM')
+    Bdir = np.array([Bx, By, Bz])
+    Bunit = Bdir/np.linalg.norm(Bdir)
+    if pos_array[0][1] > 0:
+        Bsouth = [-1*float(Bunit[0]), -1*float(Bunit[1]), -1*float(Bunit[2])]
+    else:
+        Bsouth = [float(Bunit[0]), float(Bunit[1]), float(Bunit[2])]
 
 
-positions = [ray_start[0] for n in range(nrays)]
-#freqs = [freq for n in range(nrays)]
+    # parallelizing babeeeyyy
+    nworkers = 8 #max cores = 16
 
-# --------------------------------------- run ---------------------------------------------
-# time to run is about 1 sec every 10 rays 
-#single_run_rays(ray_datenum, positions, directions, freqs, rayfile_directory, md, runmodeldump=False)
-plot_plasmasphere_1D(7,1)
-"""
-# OR run parallel at different times -- use parallel_run_rays and input a list of times, and LIST OF LISTS with positions, 
-# directions, and frequencies
-"""
+    freqs_list = [freqs[int(i * (nrays/nworkers)):int((i+1)*nrays/nworkers)] for i in range(nworkers)]
+    print('RUNNING ', nrays, nrays/nworkers)
 
-# ------------------------------------- output -------------------------------------------------
-# that's it! let's look at output
+    # same freq and starting position for all
+    directions_list = [[Bsouth for p in range(len(d))] for d in freqs_list]
+    positions = [[ray_start[0] for p in range(len(d))] for d in freqs_list]
 
-# Load all the rayfiles in the output directory
-ray_out_dir = rayfile_directory + '/'+dt.datetime.strftime(ray_datenum, '%Y-%m-%d_%H_%M_%S')
-file_titles = os.listdir(ray_out_dir)
+    tvec = [dt_array[0] for n in range(nworkers)]
+    directory_list = [rayfile_directory for i in range(len(tvec))]
+    mds = [md for i in range(len(tvec))]
 
-# create empty lists to fill with ray files and damp files
-raylist = []
-damplist = []
-for filename in file_titles:
-    if '.ray' in filename and str(md) in filename:
-        raylist += read_rayfile(os.path.join(ray_out_dir, filename))
+    fn_str = ['lat%s_lon%s'%(pos_array[0][1], pos_array[0][2]) for i in range(len(tvec))]
+    print(fn_str)
 
-plotray2D(ray_datenum, [raylist[0]], ray_out_dir, 'GEO', 'car', ['Re','Re','Re'], md, -10,show_plot=False, t_save=90)
-plotrefractivesurface(ray_datenum, raylist, ray_out_dir, 0)
+    parallel_run_rays(tvec, positions, directions_list, freqs_list, directory_list, mds, fn_str)
+
+# #  --------------------------- get ray file output ---------------------------
+# ray_out_dir = rayfile_directory + '/'+dt.datetime.strftime(dt_array[0], '%Y-%m-%d_%H_%M_%S')
+
+# file_titles = os.listdir(ray_out_dir)
+
+# raylist = []
+# mode_name = 'mode' + str(md)
+# # use mode name to avoid workers of the same label
+# x = sorted(file_titles)
+
+# for filename in x:
+#     if '.ray' in filename and mode_name in filename:
+#         raylist += read_rayfile(os.path.join(ray_out_dir, filename))
+#         print(filename)
+
+# print(raylist[0]['w'])
+
+# # plotting
+
+# for r in raylist:
+#     plotray2D(dt_array[0], [r], ray_out_dir, crs='GEO', carsph='car', units=['Re','Re','Re'], md=md, checklat=pos_array[0][1], t_save=None, plot_wna=False, show_plot=True, damping_vals=None)
+
